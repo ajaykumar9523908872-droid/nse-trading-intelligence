@@ -201,6 +201,13 @@ Rolling windows: train/configure on in-sample, evaluate on the immediately follo
 
 Proposed defaults: 3-year in-sample, 1-year out-of-sample, 1-year step. Over 15 years this yields ~12 out-of-sample windows spanning multiple regimes.
 
+> **⚠ NOT ACHIEVABLE UNDER ADR-012 (2-year backfill).** Neither window fits in ~500 sessions, of which calculator warm-up consumes about half. Options, in order of honesty:
+>
+> 1. **Report no walk-forward at all** until forward-accumulated data supports it, and label every backtest *indicative, single-regime, not validated*. **Recommended.**
+> 2. Run very short folds (e.g. 6-month in-sample / 3-month out-of-sample) while stating plainly that such folds carry almost no statistical weight.
+>
+> What must **not** happen is running short folds and reporting the output as if it were the Tier 2 evidence this section was designed to produce. The engine should refuse to emit a "validated" verdict on a window this size rather than leaving that judgement to whoever reads the report.
+
 ### 8.2 Regime coverage requirement
 
 Per §2.3 Tier 2, results must be stable across at least three disjoint regimes. Windows are labelled by the regime that dominated them (Phase 3 §7) and reported separately.

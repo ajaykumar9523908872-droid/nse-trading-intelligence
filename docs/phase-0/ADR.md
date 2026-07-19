@@ -24,7 +24,8 @@ Each ADR follows the same shape: **Context** (why a decision is needed), **Optio
 | ADR-002 | Compress `curated.option_bars` only | PROPOSED — amends §10.4 | Backfill |
 | ADR-003 | Sector classification is point-in-time | PROPOSED | Phase 3 |
 | ADR-004 | **Continuous futures roll: calendar-based, ratio-adjusted** | PROPOSED | **Phase 2 & 3** ★ |
-| ADR-005 | Backfill depth: 15 yr equity/futures, 10 yr options | PROPOSED | Backfill |
+| ADR-005 | Backfill depth: 15 yr equity/futures, 10 yr options | ⚠️ SUPERSEDED by ADR-012 | — |
+| **ADR-012** | **Backfill reduced to 2 years** | **ACCEPTED** (operator decision) | **Tier 2 validation** |
 | ADR-006 | Pre-expiry exit deadline: 3 sessions, shared with roll offset | PROPOSED | Phase 5 |
 | ADR-007 | Dashboard = Streamlit; **M15 is not built** | PROPOSED | Phase 6 |
 | ADR-008 | Retain the L1 raw layer | ACCEPTED (= DD-6) | — |
@@ -190,7 +191,7 @@ Phase 1a rollover measurement, or evidence that a derivatives calculator behaves
 
 ## ADR-005 — Backfill depth: 15 years equity/futures, 10 years options
 
-**Status:** PROPOSED · Replaces open decisions D1 and D11 (decided jointly, as the schema document recommended)
+**Status:** ⚠️ **SUPERSEDED BY ADR-012** (2026-07-19) · Retained for the reasoning trail
 
 ### Context
 
@@ -362,6 +363,62 @@ Conservative liquidity-tiered defaults, documented as assumptions rather than me
 ### Interim position
 
 `meta.data_quality_metrics` records earnings-calendar coverage by year. Backtests before the trustworthy threshold must **declare** that event blackouts were not enforceable rather than silently running without them — otherwise the earlier periods used for out-of-sample validation would understate event risk in a way that flatters results.
+
+---
+
+## ADR-012 — Backfill depth reduced to 2 years ★
+
+**Status:** ACCEPTED (operator decision, 2026-07-19) · **Supersedes ADR-005** · Resolves D1, D11
+
+### Context
+
+ADR-005 targeted 15 years of equity/futures and 10 years of options, on the reasoning that regime diversity is what makes walk-forward validation meaningful.
+
+Phase 1a probing was inconclusive about whether that depth is reachable: the first negative result was invalid (self-inflicted rate limiting — FINDINGS V3), and a proper retest was never run. **This decision is therefore a deliberate scope choice, not a data-availability constraint.** It may well be that 15 years is obtainable; the operator has chosen not to pursue it.
+
+### Decision
+
+**Retain approximately 2 years of history for all instruments.**
+
+### Consequences — accepted knowingly
+
+**Positive:**
+
+| | ADR-005 (15/10 yr) | ADR-012 (2 yr) |
+|---|---|---|
+| `option_bars` rows | ~120 M | **~16 M** |
+| Total database | ~40 GB | **~5 GB** |
+| Backfill time | days | hours |
+| ADR-002 (compression) | needed | **unnecessary** |
+
+The system becomes markedly simpler and faster to build, and every storage concern in the schema document evaporates.
+
+**Negative, and these are real:**
+
+1. **Calculator warm-up consumes most of the window.** Two years is roughly 500 trading sessions. The longest warm-up in the catalogue is C04 `volatility_regime` at **504 bars** — it will produce nothing at all. B01 `roc_252`, C02 `rv_252`, E07 `iv_rank` each need ~253. So roughly **250 sessions of usable scored history** remain: about one year.
+
+2. **Walk-forward validation as designed is impossible.** Phase 4 §8.1 proposed 3-year in-sample / 1-year out-of-sample windows. Neither fits. Any walk-forward on this window would be a handful of very short folds.
+
+3. **§2.3 Tier 2 cannot be evaluated.** It requires stability across "at least three disjoint regimes." One year spans one regime. **Tier 2 is therefore out of reach until data accumulates**, and no claim of validated edge can honestly be made before then.
+
+4. **Backtests are indicative, not evidence.** A result from ~250 sessions in a single regime is an anecdote. This must be stated on every backtest report rather than left for the reader to infer.
+
+### Why this is nonetheless a coherent choice
+
+**v1's success criterion is C9 — pipeline reliability, not alpha.** The operator's stated primary objective (§0/C9, §2.3 Tier 1) is 30 consecutive trading days of complete, validated data. Two years is entirely sufficient to build, test, and prove that machinery.
+
+What is deferred is *strategy validation*, not *system construction*. And the deferral is temporary by nature: **the pipeline accumulates roughly 250 sessions per year going forward.** Two years from now the same system holds four years of history, gathered by itself, without a backfill project.
+
+### Required handling
+
+- Every backtest report must state the history window and that Tier 2 was not evaluable.
+- C04 and any calculator whose warm-up exceeds the window must emit NULL rather than a shortened-window value (§1.4) — and their absence must be visible, not silent.
+- §15's composite must not quietly score with pillars that are empty for want of history; the `min_pillars` rule (Phase 3 §6.2) applies.
+- **Do not represent early backtest results as validated edge**, internally or otherwise.
+
+### Revisit trigger
+
+Either (a) enough forward data accumulates to support real walk-forward, or (b) the operator later chooses to pursue a deeper backfill, at which point V3 should be properly retested first.
 
 ---
 

@@ -143,17 +143,25 @@ lot sizes into reference), then V3 retest after NSE cool-down.
 
 See `docs/phase-1a/FINDINGS.md`.
 
-### ⚠️ Open issue — do NOT act on this yet
-**V3 (historical depth) is unresolved and its first evidence was invalid.**
-`NSEClient` had no inter-request delay; NSE rate-limited us, and because
-rejection presents as a **timeout, not a 404**, throttling looked identical
-to missing data. Two dates that "proved" the archive was unreachable
-download fine when politely retried.
+### Backfill = 2 years (ADR-012, operator decision 2026-07-19)
+Supersedes ADR-005. **This was a scope choice, not a data constraint** —
+V3 was never properly retested, so deeper history may well be available.
 
-- **Do NOT revise ADR-005** (15-yr backfill) until V3 is retested after a
-  cool-down with a slow crawl (5–10s between requests).
-- Lesson: a negative result from our own tool is a claim about the tool
-  first, the world second.
+**What this costs — respect it in all later work:**
+- ~500 sessions total; calculator warm-up eats ~250 → **~1 year usable**
+- **C04 `volatility_regime` (504 bars) will always be NULL**
+- **§2.3 Tier 2 is NOT evaluable** — one regime, no real walk-forward
+- **Backtests are indicative, not evidence.** Never present them as
+  validated edge. Phase 4 should refuse to emit a "validated" verdict.
+- v1 still completes on Tier 1 (C9 = pipeline reliability). Unaffected.
+- Upside: DB ~5 GB not ~40 GB; ADR-002 compression now unnecessary
+- Self-healing: pipeline gains ~250 sessions/yr going forward
+
+### Lesson worth keeping (Phase 1a)
+A negative result from our own tool is a claim about the **tool** first,
+the world second. `NSEClient` had no inter-request delay; NSE throttled
+us; and because rejection presents as a **timeout, not a 404**, it looked
+exactly like missing data. Nearly caused a permanent scope cut on a bug.
 
 ### Key measured facts (2026-07-19)
 - **210** stock F&O underlyings (C4's ~180–220 confirmed)

@@ -78,6 +78,8 @@ Automated order placement. Real-time or intraday signals. Multi-user access. Bea
 
 **Tier 2 — research validity (a research milestone, NOT a v1 completion gate):** walk-forward out-of-sample Sharpe > 0.8 after full costs including margin and roll effects; maximum drawdown < 25%; results stable across at least three disjoint time regimes.
 
+> **⚠ NOT EVALUABLE UNDER ADR-012.** The backfill is ~2 years (≈500 sessions), of which calculator warm-up consumes roughly half — leaving about one year of scored history spanning a single regime. Tier 2 requires three disjoint regimes and multi-year walk-forward windows, so it cannot be assessed until the pipeline has accumulated forward data (~250 sessions/yr). **Backtests in the interim are indicative, not evidence, and must be reported as such.** This does not affect v1 completion, which depends on Tier 1 alone (C9).
+
 > **Relationship to v1 (clarified in v2.0, resolving review finding MJ-9):** Tier 2 gates whether *recommendations may be acted upon*, not whether v1 is complete. v1 is an engineering deliverable and completes on Tier 1. If research does not reach the Tier 2 threshold, the correct response is to iterate on §19 Phases 2–3 with a working, reliable platform — not to declare the project incomplete. Conflating the two would make delivery contingent on a research outcome that no amount of engineering discipline can guarantee, which contradicts C9.
 
 **Tier 3 — decision quality (§19 Phase 6+):** measured by the Forward Performance Tracker (M21), not by subjective judgement: realised hit rate, realised risk-reward, and realised-versus-assumed slippage are computed automatically and compared monthly against backtest expectations, with a live-versus-backtest divergence metric as the primary early warning of model decay.
@@ -1507,7 +1509,7 @@ Recorded for resolution in later phases; none block Phase 1.
 
 | ID | Decision | Resolve by | Notes |
 |---|---|---|---|
-| ~~D1~~ | Historical backfill depth | **RESOLVED — ADR-005** | 15 yr equity/futures, 10 yr options (decided jointly with D11). |
+| ~~D1~~ | Historical backfill depth | **RESOLVED — ADR-012** *(supersedes ADR-005)* | **~2 years, all instruments.** Operator decision, not a data constraint. Consequence: §2.3 **Tier 2 is not evaluable** until data accumulates forward (~250 sessions/yr). v1 still completes on Tier 1 (C9). |
 | ~~D2~~ | Continuous futures roll methodology | **RESOLVED — ADR-004** | **Calendar-based, 3 sessions before expiry, ratio-adjusted.** OI-based rejected on determinism grounds; schema supports both concurrently for comparison. |
 | D3 | Fundamental data source | §19 Phase 9 | Gated on a free or sub-budget reliable source existing (§9.3.3). |
 | ~~D4~~ | Dashboard framework | **RESOLVED — ADR-007** | **Streamlit. M15 is not built**, removing a module. |
@@ -1517,7 +1519,7 @@ Recorded for resolution in later phases; none block Phase 1.
 | ~~D8~~ | Pre-expiry exit deadline | **RESOLVED — ADR-006** | 3 sessions, uniform across futures and options, **sharing its parameter with the ADR-004 roll offset**. |
 | ~~D9~~ | Whether to collapse the L1 raw layer | **RESOLVED (provisionally) — ADR-008** | Retain L1. Revisit after Phase 1a when parser churn is measured. |
 | D10 | Earliest date for event-blackout enforcement | Phase 3 | **OPEN — ADR-011 deferred.** Empirical; determined by earnings calendar coverage (§9.3.8). |
-| ~~D11~~ | Option history depth | **RESOLVED — ADR-005** | 10 years. Options serve positioning signals, not long backtests (§9.3.1). |
+| ~~D11~~ | Option history depth | **RESOLVED — ADR-012** | ~2 years, same as everything else. `option_bars` drops to ~16M rows, so **ADR-002 (compression) becomes unnecessary** and the whole storage concern in schema §13 evaporates. |
 | ~~D12~~ | Point-in-time sector classification | **RESOLVED — ADR-003** | Yes. Current-only would inject lookahead into §14.2 and §17.2. |
 
 ## Appendix B — Key Risks

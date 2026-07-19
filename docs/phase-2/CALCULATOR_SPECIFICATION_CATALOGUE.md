@@ -272,7 +272,9 @@ Each output is numeric or categorical, never both (schema §7.2 CHECK constraint
 - **Outputs:** `vol_percentile` (numeric, 0–100); `vol_regime` (categorical: `low`, `normal`, `high`, `extreme`).
 - **Min history:** 252 + 252 = 504 bars *(needs a full lookback of an already-252-bar measure)*.
 - **Depends on:** C02.
-- **Note the history requirement.** This is one of the longest in the library, and under ADR-005's 15-year equity backfill it is comfortably satisfied — but for a stock newly added to the F&O universe it will be NULL for two years. That is correct behaviour, not a defect.
+- **⚠ UNAVAILABLE UNDER ADR-012.** A 2-year backfill is ≈500 sessions, so this calculator's 504-bar requirement is **not met and it will emit NULL throughout**. That is correct behaviour per §1.4 — a shortened-window volatility percentile would be worse than nothing — but it means the Volatility pillar (§15.2) runs one feature short until forward data accumulates. Its absence must be visible in score attribution, not silent.
+
+**Warm-up budget under a 2-year window.** Longest requirements in the library: C04 at 504 bars (unavailable), then B01 `roc_252`, C02 `rv_252`, E07 `iv_rank`, F01 `rel_return_252` at ~253. So roughly **250 sessions of usable scored history** remain from a 500-session window — about one year, one regime (ADR-012).
 
 #### C05 — `c05_range_expansion`
 - **Purpose:** Identify range contraction that often precedes directional moves.
