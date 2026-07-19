@@ -205,6 +205,31 @@ Point-in-time resolution (`effective_from <= D AND (effective_to IS NULL OR effe
 
 **Honest caveat:** with only 8 dates across 2.5 years, the 64 "closed" intervals are largely sparse-sampling artefacts rather than real universe exits — the builder cannot distinguish "absent" from "not observed". The *mechanism* is proven; the *intervals* will only be accurate with a dense backfill.
 
+### F-6 — NSE bulk backfill is materially harder than assumed ★
+
+**This changes the Phase 1 effort estimate and belongs in Appendix B as a risk.**
+
+A 2-year backfill (522 weekdays × 2 files ≈ 1,044 downloads) was attempted with a 1-second inter-request delay. Result:
+
+| Elapsed | Rate | State |
+|---|---|---|
+| First ~10 min | ~21 s per trading day | Steady, no errors |
+| Next ~5 min | ~2 files total | Effectively stalled |
+| End | **27 / 522 days (5%)** | `ConnectionError: Remote end closed connection` |
+
+**NSE applies progressive throttling.** It does not reject with a clean 429 or 403. It first *slow-walks* responses (~20 s per request even when serving successfully), then begins dropping connections. Sustained bulk access degrades the more you ask for.
+
+**Implications:**
+
+1. **A bulk backfill cannot be done in one sitting.** It must run unattended over hours, with a much larger delay (5–10 s), and rely on the script's resume capability.
+2. **Phase 1's backfill task is longer than estimated** — plan for it as an overnight or multi-day background job, not a step in a work session.
+3. **The §7.4 nightly run is unaffected.** That fetches ~3 files per day, nowhere near the threshold that triggers this behaviour. This is a *backfill* problem, not an *operations* problem.
+4. **V9 (SmartAPI) becomes more important than its priority suggested.** §9.2 designates it a cross-validation source, but for bulk historical *equity* OHLCV it may be far more reliable than scraping NSE. F&O contract-level history still requires bhavcopy — there is no substitute for that.
+
+**Mitigation implemented:** `scripts/backfill.py` is resumable (skips already-archived files) and reports a high error rate as likely throttling rather than missing data, with instructions to raise the delay and re-run.
+
+**Still open:** the right delay value, and whether SmartAPI can carry the equity side. Both need measurement, not estimation.
+
 ### F-3 — Windows console encoding
 
 The default Windows console (cp1252) cannot print non-ASCII. All operational scripts must either restrict output to ASCII or set UTF-8 explicitly. Minor, but it will bite the nightly runner otherwise.
