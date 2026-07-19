@@ -1,0 +1,26 @@
+# PostgreSQL + TimescaleDB (MASTER_PLAN §11.1, §21.1)
+# Local-only: bound to 127.0.0.1, never exposed to the network (C8).
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: nse_ti_db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: nse_ti
+      POSTGRES_USER: nse
+      # Development default only. Real credentials come from the environment,
+      # never from source control (§21.4).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nse_local_dev}
+    volumes:
+      - nse_ti_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nse -d nse_ti"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  nse_ti_pgdata:

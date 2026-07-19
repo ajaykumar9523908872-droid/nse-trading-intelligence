@@ -1,0 +1,22 @@
+# Secrets — never commit (MASTER_PLAN §21.4)
+.env
+config/local/
+
+# Data — all gitignored (MASTER_PLAN §18)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
