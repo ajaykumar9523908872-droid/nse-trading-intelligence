@@ -230,6 +230,33 @@ A 2-year backfill (522 weekdays × 2 files ≈ 1,044 downloads) was attempted wi
 
 **Still open:** the right delay value, and whether SmartAPI can carry the equity side. Both need measurement, not estimation.
 
+### F-7 — UNIQUE constraint silently failed on futures because NULL ≠ NULL ★
+
+**A schema defect, and the worst kind: it worked for options and failed for futures, so partial correctness looked like correctness.**
+
+`reference.contracts` declared:
+
+```
+UNIQUE (underlying_symbol, instrument_type, expiry_date, strike_price, option_type)
+```
+
+Futures carry NULL `strike_price` and NULL `option_type`. Under standard SQL semantics **NULL is not equal to NULL**, so a UNIQUE constraint treats every futures row as distinct. `ON CONFLICT` never fired, and each `load_curated` run inserted fresh duplicates.
+
+**Symptoms observed:**
+- `futures_chain('RELIANCE')` returned 6 rows for 3 contracts
+- **4,860 contracts carried a NULL `lot_size_at_listing`** — precisely the field F-4 had just established as the *authoritative* lot for sizing a position
+- Options were entirely unaffected (both columns NOT NULL for them)
+
+**Why this mattered more than a duplicate row.** F-4 moved the authoritative lot onto the contract because lots differ across expiries. F-7 then meant that authoritative field was empty for every futures contract. Two findings compounding: the first relocated the source of truth, the second quietly emptied it. Position sizing (§24.1 stage 3) and margin (M20) both read it.
+
+**Fix (migration 004):** `UNIQUE NULLS NOT DISTINCT`, available in PostgreSQL 15+. This makes NULLs compare equal for uniqueness, which is exactly the intended semantic — two futures contracts on the same underlying and expiry *are* the same contract.
+
+**Verified after fix:** RELIANCE returns 3 futures contracts; zero contracts lack a lot size; ADANIGREEN correctly shows lot 375 for the June-2025 expiry and 600 for later ones, which is the F-4 revision pattern rendered exactly.
+
+**Process note.** The fix truncated and rebuilt `contracts`, `futures_bars` and `option_bars` from the L0 archive rather than attempting a dedupe migration. This is the **first actual use of the rebuildability property** that §10.1 retains L0 for — and it turned a delicate data-repair problem into a re-run.
+
+**Schema lesson to carry into Phase 1:** any UNIQUE constraint spanning a nullable column needs `NULLS NOT DISTINCT` or it does not constrain what it appears to. Worth auditing the remaining schema for the same shape before the full backfill lands.
+
 ### F-3 — Windows console encoding
 
 The default Windows console (cp1252) cannot print non-ASCII. All operational scripts must either restrict output to ASCII or set UTF-8 explicitly. Minor, but it will bite the nightly runner otherwise.

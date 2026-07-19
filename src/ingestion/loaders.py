@@ -73,22 +73,33 @@ def upsert_contracts(conn: psycopg.Connection, fo: pd.DataFrame) -> dict[tuple, 
     The surrogate key exists because the five-column natural key would cost
     several GB across option_bars (ADR-001). It lives only here.
     """
-    cols = ["underlying_symbol", "instrument_type", "expiry_date", "strike_price", "option_type"]
-    unique = fo[cols].drop_duplicates()
+    cols = ["underlying_symbol", "instrument_type", "expiry_date",
+            "strike_price", "option_type", "lot_size"]
+    unique = fo[cols].drop_duplicates(subset=cols[:5])
 
     rows = [
         (r.underlying_symbol, r.instrument_type, r.expiry_date,
          None if pd.isna(r.strike_price) else float(r.strike_price),
-         None if r.option_type is None or pd.isna(r.option_type) else r.option_type)
+         None if r.option_type is None or pd.isna(r.option_type) else r.option_type,
+         None if pd.isna(r.lot_size) else int(r.lot_size))
         for r in unique.itertuples()
     ]
 
     with conn.cursor() as cur:
+        # lot_size_at_listing is the AUTHORITATIVE lot for a position
+        # (Phase 1a finding F-4): lots differ across expiries when an NSE
+        # revision is pending, so the symbol-level table cannot answer
+        # "how many shares is one lot of THIS contract". DO UPDATE rather
+        # than DO NOTHING so an existing row without it gets backfilled.
         cur.executemany(
             """INSERT INTO reference.contracts
-                 (underlying_symbol, instrument_type, expiry_date, strike_price, option_type)
-               VALUES (%s, %s, %s, %s, %s)
-               ON CONFLICT ON CONSTRAINT contracts_natural_key DO NOTHING""",
+                 (underlying_symbol, instrument_type, expiry_date,
+                  strike_price, option_type, lot_size_at_listing)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               ON CONFLICT ON CONSTRAINT contracts_natural_key DO UPDATE
+                 SET lot_size_at_listing =
+                     COALESCE(EXCLUDED.lot_size_at_listing,
+                              reference.contracts.lot_size_at_listing)""",
             rows,
         )
         cur.execute(
