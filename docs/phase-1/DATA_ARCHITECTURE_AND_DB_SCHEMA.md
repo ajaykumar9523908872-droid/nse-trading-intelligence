@@ -213,6 +213,25 @@ Preserves history continuity across renames (FR-205).
 
 Point-in-time lot sizes, same derivation and same structural guarantees.
 
+> **⚠ CORRECTED by Phase 1a measurement (2026-07-19) — see FINDINGS F-4.**
+> v1.0 of this document called this table the authoritative lot source and
+> `contracts.lot_size_at_listing` a mere "snapshot". **That is backwards.**
+>
+> Real data shows lot size is a property of the **contract**, not of
+> `(symbol, date)`: on 2025-06-17, 91 of 220 symbols carried different lots
+> across expiries, because an NSE lot revision takes effect from a future
+> expiry while the running near-month contract keeps its original lot
+> (ADANIGREEN 375 → 600, ASIANPAINT 200 → 250).
+>
+> **Authoritative:** `reference.contracts.lot_size_at_listing`, per contract.
+> **This table:** the lot applicable to the **near-month** contract on each
+> date — what a swing trade in the front contract uses (§5.2.1). Any position
+> in a far month **must** read the contract-level lot.
+>
+> Consequence if ignored: §24.1 stage 3 rounds position size to whole lots.
+> Using the symbol-level lot for a far-month trade in ADANIGREEN would size
+> the position 60% wrong, and margin (M20) scales with it.
+
 | Column | Type | Null | Description |
 |---|---|---|---|
 | `symbol` | TEXT | NO | FK → `instruments` |
@@ -390,7 +409,7 @@ F&O contract dimension. One row per distinct contract ever listed.
 | `expiry_date` | DATE | NO | FK → `expiry_calendar` |
 | `strike_price` | NUMERIC | YES | NULL for futures |
 | `option_type` | TEXT | YES | `CE` \| `PE`; NULL for futures |
-| `lot_size_at_listing` | INTEGER | NO | Snapshot; authoritative lot is `lot_size_history` |
+| `lot_size_at_listing` | INTEGER | NO | **AUTHORITATIVE lot for this contract** *(corrected 2026-07-19, F-4 — lots vary by expiry within a single date, so the contract is the only correct grain)* |
 | `first_trade_date` | DATE | YES | |
 | `last_trade_date` | DATE | YES | |
 

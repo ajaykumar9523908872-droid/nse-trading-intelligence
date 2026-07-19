@@ -143,7 +143,7 @@ Lot sizes are in the F&O bhavcopy as column **`NewBrdLotQty`**.
 
 Sample: `360ONE: 500`, `ABB: 125`, `ABCAPITAL: 3100`, `ADANIENSOL: 675`, `ADANIENT: 309`, `ADANIPORTS: 475`.
 
-**Caveat to carry into Phase 1:** this was one date. A lot-size revision takes effect by expiry, so a mid-cycle date could legitimately show different lots across expiries for one symbol. The point-in-time table must be validated across a known revision before the derivation is trusted for the full backfill.
+**The caveat flagged here was immediately confirmed — see F-4 below.** The initial spot-check used a single date; a second date exposed the revision mechanic and corrected the schema design.
 
 ---
 
@@ -170,6 +170,40 @@ Live stock expiries on 2026-07-17: `2026-07-28`, `2026-08-25`, `2026-09-29` — 
 ### F-2 — Three serial monthly expiries confirmed
 
 Exactly three live stock expiries, monthly, no weekly series. Confirms **MJ-7** (the v1.0 "weekly stock series" reference was wrong) and the structural premise of **CR-3 / §5.2.1** — a 6-month horizon cannot be held in one contract, so positional trades route to equity cash.
+
+### F-4 — Lot size is a property of the CONTRACT, not of (symbol, date) ★
+
+**This corrects a schema design error**, and it was caught by an assertion written specifically to test the V6 caveat.
+
+Seeding across 8 dates failed on 2025-06-17: **91 of 220 symbols carried more than one lot size on the same date.**
+
+| Symbol | 2025-06-26 (near) | 2025-07-31 | 2025-08-28 |
+|---|---|---|---|
+| ADANIGREEN | **375** | 600 | 600 |
+| ASIANPAINT | **200** | 250 | 250 |
+| AARTIIND | **1000** | 1325 | — |
+| ADANIPORTS | **400** | 475 | 475 |
+
+This is NSE's normal revision mechanic: a new lot takes effect **from a future expiry**, while the running near-month contract keeps its original lot.
+
+**Schema correction applied** (`phase-1/DATA_ARCHITECTURE_AND_DB_SCHEMA.md` §4.4, §4.15):
+
+| | v1.0 said | Corrected |
+|---|---|---|
+| `contracts.lot_size_at_listing` | "snapshot" | **authoritative, per contract** |
+| `lot_size_history` | "authoritative" | near-month lot per date, a convenience view |
+
+**Why it matters concretely.** §24.1 stage 3 rounds position size to whole lots using "the point-in-time lot size". For a far-month position in ADANIGREEN, the symbol-level lot (375) versus the contract lot (600) is a **60% sizing error** — and M20's margin scales with lot count, so the capital figure would be wrong by the same factor. This is the same class of error as CR-1 (notional vs margin), found the same way: by checking the design against reality rather than reasoning about it.
+
+**Derivation rule now implemented:** the symbol-level table records the **near-month** contract's lot. An assertion still fires if two lots appear *within a single expiry*, which would not be the known revision pattern.
+
+### F-5 — Point-in-time universe resolution verified end to end
+
+Seeded from 8 archived dates spanning 2024-03 to 2026-07. Universe size genuinely varied: **182 → 180 → 220 → 210**.
+
+Point-in-time resolution (`effective_from <= D AND (effective_to IS NULL OR effective_to > D)`) returned **exactly the observed membership on all 8 dates**, and the database's non-overlap exclusion constraint accepted the load without conflict.
+
+**Honest caveat:** with only 8 dates across 2.5 years, the 64 "closed" intervals are largely sparse-sampling artefacts rather than real universe exits — the builder cannot distinguish "absent" from "not observed". The *mechanism* is proven; the *intervals* will only be accurate with a dense backfill.
 
 ### F-3 — Windows console encoding
 
